@@ -1,0 +1,193 @@
+document.addEventListener('DOMContentLoaded', async function() {
+  try {
+    const token = localStorage.getItem('jwt');
+    if (token && token.split('.').length !== 3) {
+      localStorage.removeItem('jwt');
+    }
+  } catch (e) {
+    console.error("Cleanup error:", e);
+  }
+  
+  const app = document.getElementById('app');
+  
+  if (!auth.isAuthenticated()) {
+    renderLoginPage(app);
+  } else {
+    await loadProfileData(app);
+  }
+});
+
+function renderLoginPage(container) {
+  container.innerHTML = `
+    <div class="login-form card">
+      <h2>Login</h2>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">Username or Email</label>
+          <input type="text" id="username" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" required>
+        </div>
+        <button type="submit" class="btn">Login</button>
+        <div id="loginError" class="error" style="display: none;"></div>
+      </form>
+    </div>
+  `;
+
+  document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const errorElement = document.getElementById('loginError');
+    errorElement.style.display = 'none';
+    
+    try {
+      await auth.login(
+        document.getElementById('username').value,
+        document.getElementById('password').value
+      );
+      window.location.reload();
+    } catch (error) {
+      errorElement.textContent = error.message;
+      errorElement.style.display = 'block';
+    }
+  });
+}
+
+async function loadProfileData(container) {
+  try {
+    const token = auth.getJWT();
+    if (!token) {
+      auth.logout();
+      return renderLoginPage(container);
+    }
+
+    const result = await graphql.fetchGraphQL(`
+      query GetFullProfile {
+        user {
+          login
+          email
+          firstName
+          lastName
+          createdAt
+        }
+        transactions: transaction(
+          where: {type: {_eq: "xp"}},
+          order_by: {createdAt: asc}
+        ) {
+          amount
+          createdAt
+          path
+        }
+        up: transaction_aggregate(
+          where: {type: {_eq: "up"}}
+        ) {
+          aggregate {
+            sum {
+              amount
+            }
+          }
+        }
+        down: transaction_aggregate(
+          where: {type: {_eq: "down"}}
+        ) {
+          aggregate {
+            sum {
+              amount
+            }
+          }
+        }
+        
+      }
+    `);
+
+    if (result.errors) {
+      throw new Error(result.errors[0].message);
+    }
+
+    const user = result.data.user[0];
+    const xpData = result.data.transactions;
+    const upAmount = result.data.up.aggregate.sum.amount || 0;
+    const downAmount = result.data.down.aggregate.sum.amount || 0;
+    const totalXp = xpData.reduce((sum, t) => sum + t.amount, 0);
+    let cursus = 0;
+    let go = 0;
+    let js = 0;
+    xpData.forEach((xp) => {
+      if(xp.path.includes("/piscine-go")){
+        go += xp.amount
+      } else if(xp.path.includes("/piscine-js/")) {
+        js += xp.amount
+      } else {
+        cursus += xp.amount
+      }
+    })
+    renderProfilePage(container, user, xpData, upAmount, downAmount,go , js, cursus, totalXp);
+
+  } catch (error) {
+    console.error("Erreur détaillée:", error);
+    container.innerHTML = `
+      <div class="error">
+        <h2>ERREUR</h2>
+        <p>${error.message}</p>
+        <button onclick="auth.logout()">Déconnexion</button>
+      </div>
+    `;
+  }
+}
+
+function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, jsXp, cursusXp, totalXp) {
+  
+  container.innerHTML = `
+    <header>
+      <div class="container">
+        <h1>${user.firstName || user.login}'s Profile</h1>
+        <button onclick="auth.logout()" class="btn btn-danger">Logout</button>
+      </div>
+    </header>
+    
+    <main class="container">
+      <div class="profile-grid">
+        <div class="card">
+          <h2>User Information</h2>
+          <p><strong>Firstname:</strong> ${user.firstName}</p>
+          <p><strong>Lastname:</strong> ${user.lastName}</p>
+          <p><strong>Login:</strong> ${user.login}</p>
+          <p><strong>Email:</strong> ${user.email}</p>
+          <p><strong>Member since:</strong> ${new Date(user.createdAt).toLocaleDateString()}</p>
+        </div>
+        
+        <div class="card">
+          <h2>XP Summary</h2>
+          <p><strong>Piscine-go:</strong> ${goXp < 1000 ? goXp : (goXp / 1000).toFixed() + "kB"}</p>
+          <p><strong>Piscine-js:</strong> ${jsXp < 1000 ? jsXp : (jsXp / 1000).toFixed() + "kB"}</p>
+          <p><strong>Cursus:</strong> ${cursusXp < 1000 ? cursusXp : (cursusXp / 1000).toFixed() + "kB"}</p>
+          <p><strong>Total XP:</strong> ${totalXp >= 1000000 ? (totalXp / 1000000).toFixed(2) + "MB" : totalXp  < 1000 ? totalXp : (totalXp / 1000).toFixed() + "kB"}</p>
+          <p><strong>Audit ratio:</strong> ${downAmount > 0 ? (upAmount / downAmount).toFixed(1) : 'N/A'}</p>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2>XP Progress Over Time</h2>
+        <div id="xpChart" class="chart-container"></div>
+      </div>
+      
+      <div class="card">
+        <h2>Audit Ratio</h2>
+        <div id="auditRatioChart" class="chart-container"></div>
+      </div>
+    </main>
+  `;
+
+  if (xpData?.length > 0) {
+    charts.createXpLineChart(xpData, 'xpChart');
+  } else {
+    console.warn("Aucune donnée XP disponible");
+  }
+
+  if (upAmount > 0 || downAmount > 0) {
+    charts.createAuditRatioPieChart(upAmount, downAmount, 'auditRatioChart');
+  } else {
+    console.warn("Aucune donnée d'audit disponible");
+  }
+}
