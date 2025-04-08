@@ -182,12 +182,10 @@ function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, 
         <div class="card">
           <h2>XP by project</h2>
           <ul id="xpProjects"></ul>
-          <button id="btnProjects" class="btn">See more...</button>
+          <button id="btnProjects" class="btn" style="margin-top: 15px;">See more...</button>
          </div>
       </div>
 
-      
-      
       <div class="charts-container">
         <div class="card">
           <h2>Piscine Go Progress</h2>
@@ -209,17 +207,30 @@ function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, 
         <h2>Audit Ratio</h2>
         <div id="auditRatioChart" class="chart-container"></div>
       </div>
+
+      <div class="projectsList">
+          <button class="close-btn">&times;</button>
+          <div class="projectsList-container">
+              <div class="projectsList-header">
+                  <h2>All XP Projects</h2>
+              </div>
+              <div class="projectsList-body">
+                  <ul id="projectsList"></ul>
+                  <div id="loadingIndicator" class="loading-indicator" style="display: none;">Loading more projects...</div>
+              </div>
+          </div>
+      </div>
+
     </main>
   `;
 
   const projects = document.getElementById("xpProjects");
-  subjects.forEach((val) => {
-    
-  })
-  for(let i = 0; i <= 4; i++){
-    projects.innerHTML += `<li style="list-style: none;">${subjects[i]}</li>`
+  
+  for(let i = 0; i <= 3; i++) {
+    projects.innerHTML += `<li style="list-style: none;">${subjects[i]}</li>`;
   }
-  // Séparer les données par type
+  
+  
   const goData = xpData.filter(xp => xp.path.includes("/piscine-go"));
   const jsData = xpData.filter(xp => xp.path.includes("/piscine-js/"));
   const cursusData = xpData.filter(xp => !xp.path.includes("/piscine-go") && !xp.path.includes("/piscine-js/"));
@@ -247,4 +258,70 @@ function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, 
   } else {
     document.getElementById('auditRatioChart').innerHTML = '<p>No audit data available</p>';
   }
-}
+  const btnProjects = document.getElementById('btnProjects');
+  const projectsList = document.querySelector('.projectsList');
+  const projectsListUl = document.getElementById('projectsList');
+  const loadingIndicator = document.getElementById('loadingIndicator');
+  const projectsListBody = document.querySelector('.projectsList-body');
+
+  let currentIndex = 0;
+  const batchSize = 20;
+  let isLoading = false;
+
+  function loadMoreProjects() {
+      if (isLoading || currentIndex >= subjects.length) return;
+      
+      isLoading = true;
+      loadingIndicator.style.display = 'block';
+      
+      setTimeout(() => {
+          const fragment = document.createDocumentFragment();
+          const endIndex = Math.min(currentIndex + batchSize, subjects.length);
+          
+          for (let i = currentIndex; i < endIndex; i++) {
+              const li = document.createElement('li');
+              li.innerHTML = subjects[i];
+              fragment.appendChild(li);
+          }
+          
+          projectsListUl.appendChild(fragment);
+          currentIndex = endIndex;
+          
+          loadingIndicator.style.display = 'none';
+          isLoading = false;
+          
+          if (currentIndex >= subjects.length) {
+              const allLoaded = document.createElement('div');
+              allLoaded.className = 'loading-indicator';
+              allLoaded.textContent = 'All projects loaded!';
+              projectsListUl.appendChild(allLoaded);
+          }
+      }, 300);
+  }
+
+  btnProjects.addEventListener('click', () => {
+      projectsList.classList.add('active');
+      projectsListUl.innerHTML = '';
+      currentIndex = 0;
+      loadMoreProjects();
+  });
+
+  projectsListBody.addEventListener('scroll', () => {
+      const { scrollTop, scrollHeight, clientHeight } = projectsListBody;
+      const threshold = 100;
+      
+      if (scrollHeight - (scrollTop + clientHeight) < threshold) {
+          loadMoreProjects();
+      }
+  });
+
+  document.querySelector('.close-btn').addEventListener('click', () => {
+      projectsList.classList.remove('active');
+  });
+
+  projectsList.addEventListener('click', (e) => {
+      if (e.target === projectsList) {
+          projectsList.classList.remove('active');
+      }
+  });
+  }
