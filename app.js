@@ -105,7 +105,6 @@ async function loadProfileData(container) {
     if (result.errors) {
       throw new Error(result.errors[0].message);
     }
-    console.log(result.data)
     const user = result.data.user[0];
     const xpData = result.data.transactions;
     const upAmount = result.data.up.aggregate.sum.amount || 0;
@@ -127,7 +126,6 @@ async function loadProfileData(container) {
         cursus += xp.amount;
       }
     })
-    console.log(campus.charAt(0).toUpperCase() + campus.slice(1))
     renderProfilePage(container, user, xpData, upAmount, downAmount,go , js, cursus, totalXp, campus);
 
   } catch (error) {
