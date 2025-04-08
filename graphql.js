@@ -23,6 +23,4 @@ window.graphql = {
   
     return response.json();
   },
-
-
 };

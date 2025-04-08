@@ -3,6 +3,10 @@ window.charts = {
     const container = document.getElementById(containerId);
     if (!container) return;
     
+    // Clear previous content
+    container.innerHTML = '';
+    
+    // Create tooltip
     const tooltip = document.createElement('div');
     tooltip.id = 'xpTooltip';
     tooltip.style.position = 'absolute';
@@ -15,85 +19,165 @@ window.charts = {
     tooltip.style.display = 'none';
     container.appendChild(tooltip);
 
-    const aggregatedData = xpData.reduce((acc, item) => {
-      const date = new Date(item.createdAt).toLocaleDateString();
-      acc[date] = (acc[date] || 0) + item.amount;
-      return acc;
-    }, {});
+    // Separate data by type
+    const dataByType = {
+      go: [],
+      js: [],
+      cursus: []
+    };
 
-    const dates = Object.keys(aggregatedData);
-    const amounts = Object.values(aggregatedData);
-    const maxAmount = Math.max(...amounts);
+    xpData.forEach(item => {
+      if (item.path.includes("/piscine-go")) {
+        dataByType.go.push(item);
+      } else if (item.path.includes("/piscine-js/")) {
+        dataByType.js.push(item);
+      } else {
+        dataByType.cursus.push(item);
+      }
+    });
 
+    // Aggregate data by date for each type
+    const aggregateData = (data) => {
+      return data.reduce((acc, item) => {
+        const date = new Date(item.createdAt).toLocaleDateString();
+        if (!acc[date]) {
+          acc[date] = 0;
+        }
+        acc[date] += item.amount;
+        return acc;
+      }, {});
+    };
+
+    const aggregatedGo = aggregateData(dataByType.go);
+    const aggregatedJs = aggregateData(dataByType.js);
+    const aggregatedCursus = aggregateData(dataByType.cursus);
+
+    // Get all unique dates
+    const allDates = [
+      ...Object.keys(aggregatedGo),
+      ...Object.keys(aggregatedJs),
+      ...Object.keys(aggregatedCursus)
+    ].filter((date, index, self) => self.indexOf(date) === index)
+     .sort((a, b) => new Date(a) - new Date(b));
+
+    // Calculate cumulative values for each type
+    const cumulativeData = {
+      go: {},
+      js: {},
+      cursus: {}
+    };
+
+    let goTotal = 0, jsTotal = 0, cursusTotal = 0;
+    allDates.forEach(date => {
+      if (aggregatedGo[date]) goTotal += aggregatedGo[date];
+      if (aggregatedJs[date]) jsTotal += aggregatedJs[date];
+      if (aggregatedCursus[date]) cursusTotal += aggregatedCursus[date];
+      
+      cumulativeData.go[date] = goTotal;
+      cumulativeData.js[date] = jsTotal;
+      cumulativeData.cursus[date] = cursusTotal;
+    });
+
+    // Find max value for scaling
+    const maxValue = Math.max(goTotal, jsTotal, cursusTotal);
+
+    // Create SVG
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", "100%");
-    svg.setAttribute("height", "1300");
-    svg.setAttribute("viewBox", `0 0 ${dates.length * 50} 1300`);
+    svg.setAttribute("height", "500");
+    svg.setAttribute("viewBox", `0 0 ${allDates.length * 50} 500`);
 
-    let xps = 0
-    let pathData = `M 0 ${1300 - (amounts[0] / maxAmount * 250)}`;
-    amounts.forEach((amount, i) => {
-      xps += amount
-      pathData += ` L ${i * 50} ${1300 - (xps / maxAmount * 250)}`;
-    });
+    // Draw grid lines
+    for (let i = 0; i <= 5; i++) {
+      const y = 500 - (i * 100);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", "0");
+      line.setAttribute("y1", y);
+      line.setAttribute("x2", allDates.length * 50);
+      line.setAttribute("y2", y);
+      line.setAttribute("stroke", "#ddd");
+      line.setAttribute("stroke-width", "1");
+      svg.appendChild(line);
 
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", pathData);
-    path.setAttribute("fill", "none");
-    path.setAttribute("stroke", "#4285f4");
-    path.setAttribute("stroke-width", "3");
-    svg.appendChild(path);
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", "0");
+      text.setAttribute("y", y - 5);
+      text.setAttribute("font-size", "12");
+      text.setAttribute("fill", "#666");
+      text.textContent = `${Math.round((i * maxValue) / 5)} XP`;
+      svg.appendChild(text);
+    }
 
-    let value = 0
-    amounts.forEach((amount, i) => {
-      value += amount
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      circle.setAttribute("cx", i * 50);
-      circle.setAttribute("cy", 1300 - (value / maxAmount * 250));
-      circle.setAttribute("r", "10");
-      circle.setAttribute("fill", "#4285f4");
-      circle.setAttribute("data-amount", amount);
-      circle.setAttribute("data-date", dates[i]);
-      circle.classList.add("data-point");
+    // Draw lines for each type
+    const drawLine = (data, color) => {
+      let pathData = '';
+      let firstPoint = true;
+      let total = 0;
       
-      circle.addEventListener('mouseover', (e) => {
-        console.log(circle.getAttribute('data-amount'))
-        const amount = circle.getAttribute('data-amount');
-        const date = circle.getAttribute('data-date');
-        tooltip.innerHTML = `<strong>${date}</strong><br>XP: ${amount}`;
-        tooltip.style.display = 'block';
+      allDates.forEach((date, i) => {
+        if (data[date]) total = data[date];
+        const y = 500 - (total / maxValue * 400);
         
-        const svgRect = container.getBoundingClientRect();
-        const pointX = parseFloat(circle.getAttribute('cx'));
-        const pointY = parseFloat(circle.getAttribute('cy'));
-        
-        const viewBox = svg.getAttribute('viewBox').split(' ');
-        const scaleX = svgRect.width / parseFloat(viewBox[2]);
-        const scaleY = svgRect.height / parseFloat(viewBox[3]);
-        
-        tooltip.style.left = `${svgRect.left + (pointX * scaleX)}px`;
-        tooltip.style.top = `${svgRect.top + (pointY * scaleY) - 30}px`;
-    });
-    
-    circle.addEventListener('mouseout', () => {
-        tooltip.style.display = 'none';
-    });
-      
-      svg.appendChild(circle);
-    });
+        if (firstPoint) {
+          pathData += `M ${i * 50} ${y}`;
+          firstPoint = false;
+        } else {
+          pathData += ` L ${i * 50} ${y}`;
+        }
+      });
 
-    dates.forEach((date, i) => {
-      if (i % 3 === 0) { 
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", pathData);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", color);
+      path.setAttribute("stroke-width", "3");
+      svg.appendChild(path);
+    };
+
+    drawLine(cumulativeData.go, "#EA4335");    // Red for Go
+    drawLine(cumulativeData.js, "#FBBC05");    // Yellow for JS
+    drawLine(cumulativeData.cursus, "#4285F4"); // Blue for Cursus
+
+    // Add date labels
+    allDates.forEach((date, i) => {
+      if (i % Math.ceil(allDates.length / 10) === 0) { // Show about 10 labels
         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
         text.setAttribute("x", i * 50);
-        text.setAttribute("y", "1300");
-        text.setAttribute("font-size", "20");
+        text.setAttribute("y", "495");
+        text.setAttribute("font-size", "12");
+        text.setAttribute("text-anchor", "middle");
         text.textContent = date;
         svg.appendChild(text);
       }
     });
 
-    container.innerHTML = '';
+    // Add legend
+    const legend = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    legend.setAttribute("transform", `translate(20, 20)`);
+    
+    const addLegendItem = (color, label, y) => {
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", "0");
+      rect.setAttribute("y", y);
+      rect.setAttribute("width", "15");
+      rect.setAttribute("height", "15");
+      rect.setAttribute("fill", color);
+      legend.appendChild(rect);
+      
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", "20");
+      text.setAttribute("y", y + 12);
+      text.setAttribute("font-size", "14");
+      text.textContent = label;
+      legend.appendChild(text);
+    };
+    
+    addLegendItem("#EA4335", "Piscine Go", 0);
+    addLegendItem("#FBBC05", "Piscine JS", 25);
+    addLegendItem("#4285F4", "Cursus", 50);
+    
+    svg.appendChild(legend);
+
     container.appendChild(svg);
     container.appendChild(tooltip);
   },
