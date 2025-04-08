@@ -78,6 +78,7 @@ async function loadProfileData(container) {
           amount
           createdAt
           path
+          campus
         }
         up: transaction_aggregate(
           where: {type: {_eq: "up"}}
@@ -104,7 +105,7 @@ async function loadProfileData(container) {
     if (result.errors) {
       throw new Error(result.errors[0].message);
     }
-
+    console.log(result.data)
     const user = result.data.user[0];
     const xpData = result.data.transactions;
     const upAmount = result.data.up.aggregate.sum.amount || 0;
@@ -113,16 +114,21 @@ async function loadProfileData(container) {
     let cursus = 0;
     let go = 0;
     let js = 0;
+    let campus = "";
+
     xpData.forEach((xp) => {
+      if (xp.campus != campus) campus = xp.campus;
+      
       if(xp.path.includes("/piscine-go")){
-        go += xp.amount
+        go += xp.amount;
       } else if(xp.path.includes("/piscine-js/")) {
-        js += xp.amount
+        js += xp.amount;
       } else {
-        cursus += xp.amount
+        cursus += xp.amount;
       }
     })
-    renderProfilePage(container, user, xpData, upAmount, downAmount,go , js, cursus, totalXp);
+    console.log(campus.charAt(0).toUpperCase() + campus.slice(1))
+    renderProfilePage(container, user, xpData, upAmount, downAmount,go , js, cursus, totalXp, campus);
 
   } catch (error) {
     console.error("Erreur détaillée:", error);
@@ -136,7 +142,7 @@ async function loadProfileData(container) {
   }
 }
 
-function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, jsXp, cursusXp, totalXp) {
+function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, jsXp, cursusXp, totalXp, campus) {
   container.innerHTML = `
     <header>
       <div class="container">
@@ -154,6 +160,7 @@ function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, 
           <p><strong>Login:</strong> ${user.login}</p>
           <p><strong>Email:</strong> ${user.email}</p>
           <p><strong>Member since:</strong> ${new Date(user.createdAt).toLocaleDateString()}</p>
+          <p><strong>Campus: </strong> ${campus.charAt(0).toUpperCase() + campus.slice(1)}</p>
         </div>
         
         <div class="card">
