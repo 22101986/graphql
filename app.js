@@ -137,7 +137,6 @@ async function loadProfileData(container) {
 }
 
 function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, jsXp, cursusXp, totalXp) {
-  
   container.innerHTML = `
     <header>
       <div class="container">
@@ -167,9 +166,21 @@ function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, 
         </div>
       </div>
       
-      <div class="card">
-        <h2>XP Progress Over Time</h2>
-        <div id="xpChart" class="chart-container"></div>
+      <div class="charts-container">
+        <div class="card">
+          <h2>Piscine Go Progress</h2>
+          <div id="goChart" class="chart-container"></div>
+        </div>
+        
+        <div class="card">
+          <h2>Piscine JS Progress</h2>
+          <div id="jsChart" class="chart-container"></div>
+        </div>
+        
+        <div class="card">
+          <h2>Cursus Progress</h2>
+          <div id="cursusChart" class="chart-container"></div>
+        </div>
       </div>
       
       <div class="card">
@@ -179,15 +190,32 @@ function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, 
     </main>
   `;
 
-  if (xpData?.length > 0) {
-    charts.createXpLineChart(xpData, 'xpChart');
+  // Séparer les données par type
+  const goData = xpData.filter(xp => xp.path.includes("/piscine-go"));
+  const jsData = xpData.filter(xp => xp.path.includes("/piscine-js/"));
+  const cursusData = xpData.filter(xp => !xp.path.includes("/piscine-go") && !xp.path.includes("/piscine-js/"));
+
+  if (goData.length > 0) {
+    charts.createSingleXpLineChart(goData, 'goChart', '#4285F4');
   } else {
-    console.warn("Aucune donnée XP disponible");
+    document.getElementById('goChart').innerHTML = '<p>No Piscine Go data available</p>';
+  }
+
+  if (jsData.length > 0) {
+    charts.createSingleXpLineChart(jsData, 'jsChart', '#FBBC05');
+  } else {
+    document.getElementById('jsChart').innerHTML = '<p>No Piscine JS data available</p>';
+  }
+
+  if (cursusData.length > 0) {
+    charts.createSingleXpLineChart(cursusData, 'cursusChart', '#34A853');
+  } else {
+    document.getElementById('cursusChart').innerHTML = '<p>No Cursus data available</p>';
   }
 
   if (upAmount > 0 || downAmount > 0) {
     charts.createAuditRatioPieChart(upAmount, downAmount, 'auditRatioChart');
   } else {
-    console.warn("Aucune donnée d'audit disponible");
+    document.getElementById('auditRatioChart').innerHTML = '<p>No audit data available</p>';
   }
 }

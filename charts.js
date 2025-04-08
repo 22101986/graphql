@@ -1,185 +1,127 @@
 window.charts = {
-  createXpLineChart(xpData, containerId) {
+  createSingleXpLineChart(xpData, containerId, color) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
-    // Clear previous content
     container.innerHTML = '';
     
-    // Create tooltip
     const tooltip = document.createElement('div');
-    tooltip.id = 'xpTooltip';
-    tooltip.style.position = 'absolute';
-    tooltip.style.pointerEvents = 'none';
-    tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-    tooltip.style.color = 'white';
-    tooltip.style.padding = '8px';
-    tooltip.style.borderRadius = '4px';
-    tooltip.style.fontSize = '14px';
+    tooltip.className = 'chart-tooltip';
     tooltip.style.display = 'none';
     container.appendChild(tooltip);
 
-    // Separate data by type
-    const dataByType = {
-      go: [],
-      js: [],
-      cursus: []
-    };
-
-    xpData.forEach(item => {
-      if (item.path.includes("/piscine-go")) {
-        dataByType.go.push(item);
-      } else if (item.path.includes("/piscine-js/")) {
-        dataByType.js.push(item);
-      } else {
-        dataByType.cursus.push(item);
+    const aggregatedData = xpData.reduce((acc, item) => {
+      const date = new Date(item.createdAt).toLocaleDateString();
+      if (!acc[date]) {
+        acc[date] = 0;
       }
+      acc[date] += item.amount;
+      return acc;
+    }, {});
+
+    const dates = Object.keys(aggregatedData).sort((a, b) => new Date(a) - new Date(b));
+    const amounts = dates.map(date => aggregatedData[date]);
+    
+    const cumulativeAmounts = [];
+    let total = 0;
+    amounts.forEach(amount => {
+      total += amount;
+      cumulativeAmounts.push(total);
     });
 
-    // Aggregate data by date for each type
-    const aggregateData = (data) => {
-      return data.reduce((acc, item) => {
-        const date = new Date(item.createdAt).toLocaleDateString();
-        if (!acc[date]) {
-          acc[date] = 0;
-        }
-        acc[date] += item.amount;
-        return acc;
-      }, {});
-    };
+    const maxAmount = Math.max(...cumulativeAmounts, 1);
+    const svgHeight = 300;
+    const svgWidth = Math.max(dates.length * 30, container.clientWidth);
+    const padding = { top: 30, right: 30, bottom: 50, left: 60 };
 
-    const aggregatedGo = aggregateData(dataByType.go);
-    const aggregatedJs = aggregateData(dataByType.js);
-    const aggregatedCursus = aggregateData(dataByType.cursus);
-
-    // Get all unique dates
-    const allDates = [
-      ...Object.keys(aggregatedGo),
-      ...Object.keys(aggregatedJs),
-      ...Object.keys(aggregatedCursus)
-    ].filter((date, index, self) => self.indexOf(date) === index)
-     .sort((a, b) => new Date(a) - new Date(b));
-
-    // Calculate cumulative values for each type
-    const cumulativeData = {
-      go: {},
-      js: {},
-      cursus: {}
-    };
-
-    let goTotal = 0, jsTotal = 0, cursusTotal = 0;
-    allDates.forEach(date => {
-      if (aggregatedGo[date]) goTotal += aggregatedGo[date];
-      if (aggregatedJs[date]) jsTotal += aggregatedJs[date];
-      if (aggregatedCursus[date]) cursusTotal += aggregatedCursus[date];
-      
-      cumulativeData.go[date] = goTotal;
-      cumulativeData.js[date] = jsTotal;
-      cumulativeData.cursus[date] = cursusTotal;
-    });
-
-    // Find max value for scaling
-    const maxValue = Math.max(goTotal, jsTotal, cursusTotal);
-
-    // Create SVG
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", "100%");
-    svg.setAttribute("height", "500");
-    svg.setAttribute("viewBox", `0 0 ${allDates.length * 50} 500`);
+    svg.setAttribute("height", svgHeight);
+    svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
 
-    // Draw grid lines
-    for (let i = 0; i <= 5; i++) {
-      const y = 500 - (i * 100);
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", "0");
-      line.setAttribute("y1", y);
-      line.setAttribute("x2", allDates.length * 50);
-      line.setAttribute("y2", y);
-      line.setAttribute("stroke", "#ddd");
-      line.setAttribute("stroke-width", "1");
-      svg.appendChild(line);
-
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      text.setAttribute("x", "0");
-      text.setAttribute("y", y - 5);
-      text.setAttribute("font-size", "12");
-      text.setAttribute("fill", "#666");
-      text.textContent = `${Math.round((i * maxValue) / 5)} XP`;
-      svg.appendChild(text);
+    const yAxisSteps = 5;
+    for (let i = 0; i <= yAxisSteps; i++) {
+      const y = ((svgHeight - padding.bottom - padding.top) * (1 - i / yAxisSteps)) + padding.top;
+      
+      const gridLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      gridLine.setAttribute("x1", padding.left);
+      gridLine.setAttribute("y1", y);
+      gridLine.setAttribute("x2", svgWidth - padding.right);
+      gridLine.setAttribute("y2", y);
+      gridLine.setAttribute("stroke", "#eee");
+      gridLine.setAttribute("stroke-width", "1");
+      svg.appendChild(gridLine);
+      
+      const yLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      yLabel.setAttribute("x", padding.left - 10);
+      yLabel.setAttribute("y", y + 5);
+      yLabel.setAttribute("text-anchor", "end");
+      yLabel.setAttribute("font-size", "10");
+      yLabel.textContent = Math.round((i / yAxisSteps) * maxAmount);
+      svg.appendChild(yLabel);
     }
 
-    // Draw lines for each type
-    const drawLine = (data, color) => {
-      let pathData = '';
-      let firstPoint = true;
-      let total = 0;
+    const pathData = cumulativeAmounts.map((amount, i) => {
+      const x = padding.left + (i * (svgWidth - padding.left - padding.right) / (dates.length - 1 || 1));
+      const y = svgHeight - padding.bottom - ((amount / maxAmount) * (svgHeight - padding.top - padding.bottom));
+      return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+    }).join(' ');
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", pathData);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", color);
+    path.setAttribute("stroke-width", "3");
+    svg.appendChild(path);
+
+    cumulativeAmounts.forEach((amount, i) => {
+      const x = padding.left + (i * (svgWidth - padding.left - padding.right) / (dates.length - 1 || 1));
+      const y = svgHeight - padding.bottom - ((amount / maxAmount) * (svgHeight - padding.top - padding.bottom));
       
-      allDates.forEach((date, i) => {
-        if (data[date]) total = data[date];
-        const y = 500 - (total / maxValue * 400);
-        
-        if (firstPoint) {
-          pathData += `M ${i * 50} ${y}`;
-          firstPoint = false;
-        } else {
-          pathData += ` L ${i * 50} ${y}`;
-        }
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", x);
+      circle.setAttribute("cy", y);
+      circle.setAttribute("r", "5");
+      circle.setAttribute("fill", color);
+      circle.setAttribute("data-date", dates[i]);
+      circle.setAttribute("data-amount", amounts[i]);
+      circle.setAttribute("data-total", amount);
+      
+      circle.addEventListener('mouseover', (e) => {
+        const rect = container.getBoundingClientRect();
+        tooltip.innerHTML = `
+          <strong>${dates[i]}</strong><br>
+          XP: ${amounts[i]}<br>
+          Total: ${amount}
+        `;
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${e.clientX - rect.left + 10}px`;
+        tooltip.style.top = `${e.clientY - rect.top - 60}px`;
       });
+      
+      circle.addEventListener('mouseout', () => {
+        tooltip.style.display = 'none';
+      });
+      
+      svg.appendChild(circle);
+    });
 
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", pathData);
-      path.setAttribute("fill", "none");
-      path.setAttribute("stroke", color);
-      path.setAttribute("stroke-width", "3");
-      svg.appendChild(path);
-    };
-
-    drawLine(cumulativeData.go, "#EA4335");    // Red for Go
-    drawLine(cumulativeData.js, "#FBBC05");    // Yellow for JS
-    drawLine(cumulativeData.cursus, "#4285F4"); // Blue for Cursus
-
-    // Add date labels
-    allDates.forEach((date, i) => {
-      if (i % Math.ceil(allDates.length / 10) === 0) { // Show about 10 labels
+    dates.forEach((date, i) => {
+      if (i % Math.ceil(dates.length / 10) === 0) { 
+        const x = padding.left + (i * (svgWidth - padding.left - padding.right) / (dates.length - 1 || 1));
+        
         const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        text.setAttribute("x", i * 50);
-        text.setAttribute("y", "495");
-        text.setAttribute("font-size", "12");
+        text.setAttribute("x", x);
+        text.setAttribute("y", svgHeight - 15);
         text.setAttribute("text-anchor", "middle");
+        text.setAttribute("font-size", "10");
+        text.setAttribute("transform", `rotate(45, ${x}, ${svgHeight - 15})`);
         text.textContent = date;
         svg.appendChild(text);
       }
     });
 
-    // Add legend
-    const legend = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    legend.setAttribute("transform", `translate(20, 20)`);
-    
-    const addLegendItem = (color, label, y) => {
-      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      rect.setAttribute("x", "0");
-      rect.setAttribute("y", y);
-      rect.setAttribute("width", "15");
-      rect.setAttribute("height", "15");
-      rect.setAttribute("fill", color);
-      legend.appendChild(rect);
-      
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      text.setAttribute("x", "20");
-      text.setAttribute("y", y + 12);
-      text.setAttribute("font-size", "14");
-      text.textContent = label;
-      legend.appendChild(text);
-    };
-    
-    addLegendItem("#EA4335", "Piscine Go", 0);
-    addLegendItem("#FBBC05", "Piscine JS", 25);
-    addLegendItem("#4285F4", "Cursus", 50);
-    
-    svg.appendChild(legend);
-
     container.appendChild(svg);
-    container.appendChild(tooltip);
   },
 
   createAuditRatioPieChart(up, down, containerId) {
