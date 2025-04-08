@@ -7,7 +7,7 @@ window.charts = {
     
     const tooltip = document.createElement('div');
     tooltip.className = 'chart-tooltip';
-    tooltip.style.display = 'none';
+    container.style.position = 'relative'; // Important
     container.appendChild(tooltip);
 
     const aggregatedData = xpData.reduce((acc, item) => {
@@ -88,20 +88,29 @@ window.charts = {
       circle.setAttribute("data-total", amount);
       
       circle.addEventListener('mouseover', (e) => {
-        const rect = container.getBoundingClientRect();
+        const svgRect = svg.getBoundingClientRect();
+        const pointX = parseFloat(circle.getAttribute('cx'));
+        const pointY = parseFloat(circle.getAttribute('cy'));
+        
+        // Calculer la position relative dans le SVG
+        const viewBox = svg.getAttribute('viewBox').split(' ');
+        const scaleX = svgRect.width / parseFloat(viewBox[2]);
+        const scaleY = svgRect.height / parseFloat(viewBox[3]);
+        
+        // Positionner la tooltip par rapport au conteneur
         tooltip.innerHTML = `
-          <strong>${dates[i]}</strong><br>
-          XP: ${amounts[i]}<br>
-          Total: ${amount}
+            <strong>${dates[i]}</strong><br>
+            XP: ${amounts[i]}<br>
+            Total: ${amount}
         `;
         tooltip.style.display = 'block';
-        tooltip.style.left = `${e.clientX - rect.left + 10}px`;
-        tooltip.style.top = `${e.clientY - rect.top - 60}px`;
-      });
-      
-      circle.addEventListener('mouseout', () => {
+        tooltip.style.left = `${pointX * scaleX - 50}px`; // Ajustez -50 pour centrer
+        tooltip.style.top = `${pointY * scaleY - 40}px`;  // Ajustez -40 pour positionner au-dessus
+    });
+    
+    circle.addEventListener('mouseout', () => {
         tooltip.style.display = 'none';
-      });
+    });
       
       svg.appendChild(circle);
     });
