@@ -105,6 +105,7 @@ async function loadProfileData(container) {
     if (result.errors) {
       throw new Error(result.errors[0].message);
     }
+    console.log(result.data)
     const user = result.data.user[0];
     const xpData = result.data.transactions;
     const upAmount = result.data.up.aggregate.sum.amount || 0;
@@ -114,10 +115,11 @@ async function loadProfileData(container) {
     let go = 0;
     let js = 0;
     let campus = "";
-
-    xpData.forEach((xp) => {
+    let subjects = [];
+    xpData.forEach((xp) => { 
+      console.log(xp)
       if (xp.campus != campus) campus = xp.campus;
-      
+      subjects.push(`<strong>${xp.path.match(/\/([^\/]+)$/)[1]}:</strong> +${xp.amount}xp  ${new Date(xp.createdAt).toLocaleDateString()}`)
       if(xp.path.includes("/piscine-go")){
         go += xp.amount;
       } else if(xp.path.includes("/piscine-js/")) {
@@ -126,7 +128,7 @@ async function loadProfileData(container) {
         cursus += xp.amount;
       }
     })
-    renderProfilePage(container, user, xpData, upAmount, downAmount,go , js, cursus, totalXp, campus);
+    renderProfilePage(container, user, xpData, upAmount, downAmount,go , js, cursus, totalXp, campus, subjects.reverse());
 
   } catch (error) {
     console.error("Erreur détaillée:", error);
@@ -140,7 +142,14 @@ async function loadProfileData(container) {
   }
 }
 
-function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, jsXp, cursusXp, totalXp, campus) {
+function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, jsXp, cursusXp, totalXp, campus, subjects) {
+  console.log(subjects)
+  const options = {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  };
   container.innerHTML = `
     <header>
       <div class="container">
@@ -157,7 +166,7 @@ function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, 
           <p><strong>Lastname:</strong> ${user.lastName}</p>
           <p><strong>Login:</strong> ${user.login}</p>
           <p><strong>Email:</strong> ${user.email}</p>
-          <p><strong>Member since:</strong> ${new Date(user.createdAt).toLocaleDateString()}</p>
+          <p><strong>Member since:</strong> ${new Date(user.createdAt).toLocaleString("en-EN", options)}</p>
           <p><strong>Campus: </strong> ${campus.charAt(0).toUpperCase() + campus.slice(1)}</p>
         </div>
         
@@ -169,7 +178,15 @@ function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, 
           <p><strong>Total XP:</strong> ${totalXp >= 1000000 ? (totalXp / 1000000).toFixed(2) + "MB" : totalXp  < 1000 ? totalXp : (totalXp / 1000).toFixed() + "kB"}</p>
           <p><strong>Audit ratio:</strong> ${downAmount > 0 ? (upAmount / downAmount).toFixed(1) : 'N/A'}</p>
         </div>
+
+        <div class="card">
+          <h2>XP by project</h2>
+          <ul id="xpProjects"></ul>
+          <button id="btnProjects" class="btn">See more...</button>
+         </div>
       </div>
+
+      
       
       <div class="charts-container">
         <div class="card">
@@ -195,6 +212,13 @@ function renderProfilePage(container, user, xpData, upAmount, downAmount, goXp, 
     </main>
   `;
 
+  const projects = document.getElementById("xpProjects");
+  subjects.forEach((val) => {
+    
+  })
+  for(let i = 0; i <= 4; i++){
+    projects.innerHTML += `<li style="list-style: none;">${subjects[i]}</li>`
+  }
   // Séparer les données par type
   const goData = xpData.filter(xp => xp.path.includes("/piscine-go"));
   const jsData = xpData.filter(xp => xp.path.includes("/piscine-js/"));

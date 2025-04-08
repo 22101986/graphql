@@ -7,7 +7,7 @@ window.charts = {
     
     const tooltip = document.createElement('div');
     tooltip.className = 'chart-tooltip';
-    container.style.position = 'relative'; // Important
+    container.style.position = 'relative'; 
     container.appendChild(tooltip);
 
     const aggregatedData = xpData.reduce((acc, item) => {
