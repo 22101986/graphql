@@ -5,11 +5,13 @@ window.charts = {
     
     container.innerHTML = '';
     
+    // Tooltip for showing point info
     const tooltip = document.createElement('div');
     tooltip.className = 'chart-tooltip';
     container.style.position = 'relative'; 
     container.appendChild(tooltip);
 
+    // Aggregate XP by date
     const aggregatedData = xpData.reduce((acc, item) => {
       const date = new Date(item.createdAt).toLocaleDateString();
       if (!acc[date]) {
@@ -22,6 +24,7 @@ window.charts = {
     const dates = Object.keys(aggregatedData).sort((a, b) => new Date(a) - new Date(b));
     const amounts = dates.map(date => aggregatedData[date]);
     
+    // Calculate cumulative XP
     const cumulativeAmounts = [];
     let total = 0;
     amounts.forEach(amount => {
@@ -34,11 +37,13 @@ window.charts = {
     const svgWidth = Math.max(dates.length * 30, container.clientWidth);
     const padding = { top: 30, right: 30, bottom: 50, left: 60 };
 
+    // Create SVG container
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", "100%");
     svg.setAttribute("height", svgHeight);
     svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
 
+    // Draw horizontal grid lines and Y-axis labels
     const yAxisSteps = 5;
     for (let i = 0; i <= yAxisSteps; i++) {
       const y = ((svgHeight - padding.bottom - padding.top) * (1 - i / yAxisSteps)) + padding.top;
@@ -61,6 +66,7 @@ window.charts = {
       svg.appendChild(yLabel);
     }
 
+    // Create line path for cumulative XP
     const pathData = cumulativeAmounts.map((amount, i) => {
       const x = padding.left + (i * (svgWidth - padding.left - padding.right) / (dates.length - 1 || 1));
       const y = svgHeight - padding.bottom - ((amount / maxAmount) * (svgHeight - padding.top - padding.bottom));
@@ -74,6 +80,7 @@ window.charts = {
     path.setAttribute("stroke-width", "3");
     svg.appendChild(path);
 
+    // Draw points with tooltip interactions
     cumulativeAmounts.forEach((amount, i) => {
       const x = padding.left + (i * (svgWidth - padding.left - padding.right) / (dates.length - 1 || 1));
       const y = svgHeight - padding.bottom - ((amount / maxAmount) * (svgHeight - padding.top - padding.bottom));
@@ -92,29 +99,28 @@ window.charts = {
         const pointX = parseFloat(circle.getAttribute('cx'));
         const pointY = parseFloat(circle.getAttribute('cy'));
         
-        // Calculer la position relative dans le SVG
         const viewBox = svg.getAttribute('viewBox').split(' ');
         const scaleX = svgRect.width / parseFloat(viewBox[2]);
         const scaleY = svgRect.height / parseFloat(viewBox[3]);
         
-        // Positionner la tooltip par rapport au conteneur
         tooltip.innerHTML = `
             <strong>${dates[i]}</strong><br>
             XP: ${amounts[i]}<br>
             Total: ${amount}
         `;
         tooltip.style.display = 'block';
-        tooltip.style.left = `${pointX * scaleX - 50}px`; // Ajustez -50 pour centrer
-        tooltip.style.top = `${pointY * scaleY - 40}px`;  // Ajustez -40 pour positionner au-dessus
-    });
+        tooltip.style.left = `${pointX * scaleX - 50}px`;
+        tooltip.style.top = `${pointY * scaleY - 40}px`;
+      });
     
-    circle.addEventListener('mouseout', () => {
+      circle.addEventListener('mouseout', () => {
         tooltip.style.display = 'none';
-    });
+      });
       
       svg.appendChild(circle);
     });
 
+    // Add date labels on X-axis
     dates.forEach((date, i) => {
       if (i % Math.ceil(dates.length / 10) === 0) { 
         const x = padding.left + (i * (svgWidth - padding.left - padding.right) / (dates.length - 1 || 1));
@@ -145,6 +151,7 @@ window.charts = {
 
     const upPercentage = (up / total) * 100;
 
+    // Create SVG for pie chart
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", "300");
     svg.setAttribute("height", "300");
@@ -154,6 +161,7 @@ window.charts = {
     const centerX = 150;
     const centerY = 150;
 
+    // "Up" slice
     const upStartAngle = 0;
     const upEndAngle = (upPercentage / 100) * 360;
     const upPath = this.describeArc(centerX, centerY, radius, upStartAngle, upEndAngle);
@@ -163,6 +171,7 @@ window.charts = {
     upSlice.setAttribute("fill", "#34a853");
     svg.appendChild(upSlice);
 
+    // "Down" slice
     const downStartAngle = upEndAngle;
     const downEndAngle = 360;
     const downPath = this.describeArc(centerX, centerY, radius, downStartAngle, downEndAngle);
@@ -172,6 +181,7 @@ window.charts = {
     downSlice.setAttribute("fill", "#ea4335");
     svg.appendChild(downSlice);
 
+    // Inner circle for center label
     const centerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     centerCircle.setAttribute("cx", centerX);
     centerCircle.setAttribute("cy", centerY);
@@ -179,6 +189,7 @@ window.charts = {
     centerCircle.setAttribute("fill", "white");
     svg.appendChild(centerCircle);
 
+    // Display ratio text
     const ratioText = document.createElementNS("http://www.w3.org/2000/svg", "text");
     ratioText.setAttribute("x", centerX);
     ratioText.setAttribute("y", centerY - 10);
@@ -192,6 +203,7 @@ window.charts = {
     container.appendChild(svg);
   },
 
+  // Generates an SVG arc path from polar coordinates
   describeArc(x, y, radius, startAngle, endAngle) {
     const start = this.polarToCartesian(x, y, radius, endAngle);
     const end = this.polarToCartesian(x, y, radius, startAngle);
@@ -205,6 +217,7 @@ window.charts = {
     ].join(" ");
   },
 
+  // Converts polar coordinates to Cartesian coordinates
   polarToCartesian(centerX, centerY, radius, angleInDegrees) {
     const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
     return {
