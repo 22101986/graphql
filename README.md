@@ -27,3 +27,5 @@ This project is a personal profile dashboard built with JavaScript and powered b
 - **JavaScript**
 - **GraphQL**
 - **SVG** (for data visualization)
+
+[`https://bright-blancmange-6f75e4.netlify.app/`](https://bright-blancmange-6f75e4.netlify.app/)
